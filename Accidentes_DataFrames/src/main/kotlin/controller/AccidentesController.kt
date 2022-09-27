@@ -30,9 +30,9 @@ class AccidentesController {
         fallecidosPorBarrios()
         fallecidosPorSexo()
 
-//        mesMasIngresos()
-//        mesMasFallecidos()    No lo consigo
-//        mediaIngresosPorMes()
+        mesMasIngresos()
+        mesMasFallecidos()
+        mediaIngresosPorMes()
 
         fallecidoAlcoholDrogasAmbos()
         barrioMasFallecidos()
@@ -42,6 +42,7 @@ class AccidentesController {
         numeroFallecidosAtropello()
         agruparAtropellosBarriosMayorMenor()
     }
+
 
     private fun agruparAtropellosBarriosMayorMenor() {
         println("Agrupación atropellos por barrio de mayor a menor")
@@ -97,10 +98,32 @@ class AccidentesController {
     }
 
     private fun mesMasIngresos() {
-        var mes = dataFrame.filter { it.lesividad==tiposLesividad.LEVEINGRESO|| it.lesividad==tiposLesividad.GRAVE  }
+       var agrupadosMeses = dataFrame.convert { fecha }.with { it.month }
+           .filter { it.lesividad==tiposLesividad.LEVE || it.lesividad==tiposLesividad.LEVEINGRESO }
+           .groupBy("fecha").aggregate {
+               count() into "total"
+           }
+
+        println("Mes con más ingresos: ${agrupadosMeses.max()["fecha"]}")
+    }
+
+
+    private fun mesMasFallecidos() {
+        var agrupadosMeses = dataFrame.convert { fecha }.with { it.month }
+            .filter { it.lesividad==tiposLesividad.FALLECIDO }
             .groupBy("fecha").aggregate {
                 count() into "total"
-        }.max()
+            }
+        println("Mes con más fallecidos: ${agrupadosMeses.max()["fecha"]}")
+    }
+
+    private fun mediaIngresosPorMes() {
+        println("Media de ingresos por mes")
+        dataFrame.convert { fecha }.with { it.month }
+            .filter { it.lesividad==tiposLesividad.LEVEINGRESO|| it.lesividad==tiposLesividad.GRAVE }
+            .groupBy("fecha").aggregate {
+                mean() into "media"
+            }.print()
     }
 
 
@@ -148,12 +171,43 @@ class AccidentesController {
      *
      */
     public fun cuestionesBarrio(barrio: String){
-        //Accidentes por mes
+        println("---------- Distrito: $barrio ----------")
+        accidentesBarrioMes(barrio)
         problemasAlcoholDrogasAmbos(barrio)
         fallecidos(barrio)
-        //graficaPorMeses
+        graficaAccidentesPorMeses(barrio)
         graficaTipoAccidentes()
         graficaTipoLesividad()
+    }
+
+    private fun graficaAccidentesPorMeses(barrio: String) {
+        val agrupado = dataFrame.convert { fecha }.with { it.month }
+            .groupBy("fecha").aggregate {
+                count() into "total"
+            }
+
+        val fig:Plot = letsPlot(data=agrupado.toMap()) +geomBar(
+            stat=Stat.identity,
+            alpha=0.8,
+            fill = Color.BLUE
+        ) {
+            x ="fecha"
+            y ="total"
+        } + labs(
+            x ="Meses",
+            y = "Total",
+            title ="Total Accidentes por Mes"
+        )
+
+        ggsave(fig,"03-AccidentesPorMeses.png")
+    }
+
+    private fun accidentesBarrioMes(barrio: String) {
+        dataFrame.convert { fecha }.with { it.month }
+            .filter { it.distrito==barrio }
+            .groupBy("fecha").aggregate {
+                count() into "total"
+            }.print()
     }
 
     private fun graficaTipoLesividad() {
